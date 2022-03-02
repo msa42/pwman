@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#
+# This file is part of PWMAN.
+# (C) 2022 Theodore Huang <msa42@ctemplar.com>
+#
+# PWMAN is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# PWMAN is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with PWMAN.
+# If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+set -euo pipefail
+
+# Password generation settings
+PASSWORD_LENGTH=16
+PWGEN_FLAGS=(-c -n -s -y)
+SCRYPT_FLAGS=(-kdfopt n:262144 -kdfopt r:8 -kdfopt p:6 -kdfopt maxmem_bytes:536870912)
+SCRYPT_KEY_LENGTH=128
+SCRYPT_SALT="NaCL" # FIXME You MUST change this value!
+
+# General settings
+DISPLAY_TIME=7
+HASH_CMD=sha256sum
+PWMAN_DIR=~/.local/share/pwman
+
+# Functions
+usage_print() {
+  echo "usage: pwman <key_name>"
+}
+
+env_check() {
+  if ! command -v "$1" &> /dev/null
+  then
+    echo "$1 could not be found"
+    exit 1
+  fi
+}
+
+# Main
+env_check openssl
+env_check pwgen
+
+PASSWORD_KEY_NAME=
+
+if [ -z ${1+x} ]; then
+  usage_print
+  exit 1
+else
+  PASSWORD_KEY_NAME=$*
+fi
+
+read -r -s -p 'passphrase: ' PASSPHRASE
+
+PASSPHRASE_HASH=$(echo -n "$PASSPHRASE" | "$HASH_CMD" | cut -d " " -f 1 )
+PASSPHRASE_FILE="$PWMAN_DIR/$PASSPHRASE_HASH"
+
+if [ ! -f "$PASSPHRASE_FILE" ]; then
+  echo -e "\n\nUnrecognized passphrase, you can add a passphrase using 'pwman-add'."
+  exit 1
+fi
+
+echo -n -e "\npassword: "
+PASSWORD_KEY=$(openssl kdf -keylen $SCRYPT_KEY_LENGTH \
+                            -kdfopt pass:"$PASSPHRASE$PASSWORD_KEY_NAME" \
+                            -kdfopt salt:"$SCRYPT_SALT" "${SCRYPT_FLAGS[@]}" SCRYPT)
+PASSWORD_VALUE=$(pwgen -H "/dev/null#$PASSWORD_KEY" -N 1 "${PWGEN_FLAGS[@]}" "$PASSWORD_LENGTH")
+echo -n "$PASSWORD_VALUE"
+
+set +e
+read -n 1 -r -t "$DISPLAY_TIME" -p "" -s
+set -e
+
+echo -n -e "\rpassword: "
+printf '*%.0s' $(seq 1 $PASSWORD_LENGTH)
+echo -n -e "\n"

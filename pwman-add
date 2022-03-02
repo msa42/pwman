@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# This file is part of PWMAN.
+# (C) 2022 Theodore Huang <msa42@ctemplar.com>
+#
+# PWMAN is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# PWMAN is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with PWMAN.
+# If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+set -euo pipefail
+
+# General settings
+DISPLAY_TIME=7
+HASH_CMD=sha256sum
+PWMAN_DIR=~/.local/share/pwman
+
+# Main
+read -r -s -p 'passphrase: ' PASSPHRASE
+PASSPHRASE_HASH=$(echo -n "$PASSPHRASE" | "$HASH_CMD" | cut -d " " -f 1 )
+
+echo -e "\r           \n\tPlease VERIFY your passphrase!"
+echo -n -e "(press any key to hide or it will be hidden in $DISPLAY_TIME seconds)\n\n"
+
+echo -n -e "passphrase: $PASSPHRASE"
+
+set +e
+read -n 1 -r -t "$DISPLAY_TIME" -p "" -s
+set -e
+
+echo -n -e "\rpassphrase: "
+printf '*%.0s' $(seq 1 ${#PASSPHRASE})
+echo -n -e "\n"
+
+mkdir -p "$PWMAN_DIR"
+
+PASSPHRASE_FILE="$PWMAN_DIR/$PASSPHRASE_HASH"
+
+touch "$PASSPHRASE_FILE"
+echo -e "\nadded: $PASSPHRASE_FILE"
